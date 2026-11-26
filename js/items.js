@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { ActiveTimer } from './timer.js';
 import * as AR from './ar.js';
 import * as Hand from './hand.js';
+import { createScreenBoard } from './screenboard.js';
 import { SUBTOPICS } from './questions.js';
 import { el, shuffle, normaliseSpeech } from './util.js';
 
@@ -475,7 +476,11 @@ function boardItem(item, ctx, text, modeName) {
     const mono = item.cards.every((c) => /\(\)$/.test(c.label));
     const cards = shuffle(item.cards);
     const targets = isOrder ? item.cards.map((_, i) => ({ id: `slot${i + 1}`, label: String(i + 1) })) : shuffle(item.boxes);
-    const board = AR.createBoard({ kind: isOrder ? 'order' : 'classify', cards, targets, accent, mono });
+    // Gesture: papan terapung atas paparan kamera (tangan tidak menutup marker).
+    // Touch: papan 3D atas kad marker.
+    const board = isGesture
+      ? createScreenBoard({ cards, targets, accent, mono })
+      : AR.createBoard({ kind: isOrder ? 'order' : 'classify', cards, targets, accent, mono });
 
     const rt = new ActiveTimer();
     const shownAt = performance.now();
@@ -491,7 +496,7 @@ function boardItem(item, ctx, text, modeName) {
     ]));
 
     if (isGesture) {
-      help.textContent = 'Hold the phone with one hand. With your other hand in front of the camera, pinch a card (thumb + index finger), move it into a box, then open your fingers.';
+      help.textContent = 'Hold the phone with one hand. Put your other hand in front of the back camera, pinch a card with your thumb and index finger, move it into a box, then open your fingers. You do not need the marker for this question.';
       board.setPointerEnabled(false);
       Hand.load().then((ok) => { if (!ok) showFallback('Hand tracking could not load.'); });
       Hand.start((st, wasPinch) => {

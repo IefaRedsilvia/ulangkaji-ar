@@ -29,7 +29,7 @@ export const CONFIG = {
   // melebihi 45 minit, tukar kepada 4 (80%) SEBELUM pilot sebenar, bukan di tengahnya.
   CRITERION: 5,
   CONSENT_VERSION: 'v1-2026-11',
-  APP_VERSION: '1.3.1',
+  APP_VERSION: '1.3.2',
 };
 
 if (CONFIG.DEV) CONFIG.MIN_GAP_DAYS = [null, 0, 0];

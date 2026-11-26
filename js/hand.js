@@ -142,6 +142,9 @@ function draw(pts) {
   if (state.visible) {
     ctx.beginPath();
     ctx.arc(state.x * k, state.y * k, (state.pinch ? 11 : 16) * k, 0, Math.PI * 2);
+    ctx.lineWidth = 8 * k;                       // garis luar gelap supaya kursor nampak atas kad putih
+    ctx.strokeStyle = 'rgba(29, 43, 68, 0.85)';
+    ctx.stroke();
     ctx.lineWidth = 4 * k;
     ctx.strokeStyle = state.pinch ? '#ffd166' : '#ffffff';
     ctx.stroke();

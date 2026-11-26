@@ -207,3 +207,28 @@ body:not(.diagram-on) .panel-content { top: 0; max-height: none; border-radius: 
 .sim-node.sel { background: var(--ok); color: #fff; }
 body.diagram-on .panel-full { top: 40vh; }
 .q-meta { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--sub-ink); background: var(--sub-soft); display: inline-block; padding: 4px 10px; border-radius: 999px; margin-bottom: 8px; }
+
+/* ---------- papan skrin (soalan gesture) ---------- */
+#screen-board {
+  position: fixed; left: 0; right: 0; top: max(14px, env(safe-area-inset-top)); height: 52vh; z-index: 3;
+  display: flex; flex-direction: column; justify-content: space-between; padding: 8px 12px; pointer-events: none;
+}
+body.screen-mode #screen-board { display: none; }
+#screen-board.touchable { pointer-events: auto; touch-action: none; }
+.sb-pool { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 52px; }
+.sb-card {
+  background: rgba(255,255,255,.95); border: 2px solid var(--acc); color: var(--ink); border-radius: 12px;
+  padding: 10px 12px; font: 700 15px var(--f-b); text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,.25);
+  max-width: 46vw; user-select: none; -webkit-user-select: none;
+}
+.sb-card.mono { font-family: var(--f-m); }
+.sb-card.dragging { position: fixed; transform: translate(-50%, -50%) scale(1.06); background: #ffd166; border-color: #c99a1c; z-index: 5; margin: 0; }
+.sb-boxes { display: grid; gap: 8px; }
+.sb-box {
+  min-height: 21vh; border: 2.5px dashed var(--acc); border-radius: 14px; background: rgba(255,255,255,.55);
+  padding: 6px; display: flex; flex-direction: column; gap: 6px; transition: background .15s;
+}
+.sb-box.over { background: rgba(255,209,102,.6); border-style: solid; }
+.sb-box-label { font: 800 14px var(--f-d); text-align: center; color: var(--ink); background: rgba(255,255,255,.85); border-radius: 8px; padding: 3px; }
+.sb-box-cards { display: flex; flex-direction: column; gap: 5px; }
+.sb-box-cards .sb-card { font-size: 13px; padding: 7px 8px; max-width: none; box-shadow: none; }
