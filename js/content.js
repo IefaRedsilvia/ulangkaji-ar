@@ -32,6 +32,7 @@ const SCENARIOS = {
 export function showContent(subtopic, { wrongItems = [], round = 0, logEvent }) {
   return new Promise((resolve) => {
     AR.clearHighlights();
+    document.body.dataset.sub = subtopic;
     const opened = performance.now();
     logEvent({ type: 'content_open', section: subtopic, round });
     const done = () => {

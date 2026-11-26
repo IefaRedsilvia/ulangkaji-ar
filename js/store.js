@@ -192,8 +192,21 @@ export async function getParticipant(pid) {
     const local = localParticipant(pid);
     try {
       const url = `${sheetsConfig.SHEETS_URL}?op=participant&pid=${encodeURIComponent(pid)}&token=${encodeURIComponent(sheetsConfig.APP_TOKEN)}`;
-      const out = await (await fetch(url)).json();
-      if (!out.ok) throw new Error(out.error || 'ralat');
+      let res, out;
+      try {
+        res = await fetch(url);
+      } catch {
+        throw new Error(navigator.onLine
+          ? 'Cannot reach Google Sheets. Check SHEETS_URL in js/sheets-config.js and that the Web app access is "Anyone".'
+          : 'No internet connection. Connect to the internet and try again.');
+      }
+      try {
+        out = await res.json();
+      } catch {
+        throw new Error('Google Sheets did not return data (HTTP ' + res.status + '). Check that SHEETS_URL ends with /exec and the Web app access is "Anyone".');
+      }
+      if (!out.ok && out.error === 'token') throw new Error('APP_TOKEN does not match Code.gs. If you changed Code.gs, deploy a New version.');
+      if (!out.ok) throw new Error('Google Sheets error: ' + (out.error || 'unknown'));
       const remote = out.participant;
       // Rekod tempatan mungkin lebih baharu jika ada data yang belum dihantar
       if (remote && local && (local.sessions_completed || 0) > (remote.sessions_completed || 0)) return local;
@@ -201,7 +214,7 @@ export async function getParticipant(pid) {
     } catch (e) {
       console.warn('Tidak dapat membaca peserta dari Sheets; guna salinan tempatan', e);
       if (local) return local;
-      throw new Error('No internet connection. Connect to the internet and try again.');
+      throw e;
     }
   }
   return localParticipant(pid);

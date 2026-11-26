@@ -8,8 +8,9 @@ import { CONFIG } from './config.js';
 import * as Store from './store.js';
 import * as AR from './ar.js';
 import { ITEMS, TRAINING_ITEMS, SUBTOPICS } from './questions.js';
-import { runItem } from './items.js';
+import { runItem, SUB_COLORS } from './items.js';
 import { showContent } from './content.js';
+import * as Hand from './hand.js';
 import { ActiveTimer, onVisibilityChange } from './timer.js';
 import { el, shuffle, deviceInfo, nowStamp, formatDate, sleep } from './util.js';
 
@@ -25,9 +26,20 @@ const S = {            // keadaan sesi semasa
   responses: [],
 };
 
+function appbar() {
+  return el('div', { class: 'appbar' }, [
+    el('span', { class: 'logo', text: 'AR' }), 'AR Review Study',
+    el('span', { class: 'logo-sub', text: S.pid ? S.pid : 'Mobile Programming' }),
+  ]);
+}
 function screen(children, cls = '') {
   document.body.classList.add('screen-mode');
-  ui().replaceChildren(el('section', { class: 'screen ' + cls }, children));
+  document.body.dataset.sub = 'none';
+  ui().replaceChildren(el('section', { class: 'screen ' + cls }, [appbar(), ...children]));
+}
+function dayPills(current = -1) {
+  return el('div', { class: 'days' }, CONFIG.SESSION_DAYS.map((d, i) =>
+    el('span', { class: 'day' + (i === current ? ' now' : i < current ? ' done' : ''), text: `Day ${d}` })));
 }
 function overlayMode() { document.body.classList.remove('screen-mode'); }
 
@@ -64,8 +76,9 @@ function loginScreen(msg = '') {
   const btn = el('button', { class: 'btn primary', type: 'button', text: 'Continue' });
   const err = el('p', { class: 'error', text: msg });
   screen([
-    el('h1', { text: 'AR Review Study' }),
-    el('p', { text: 'Activity Lifecycle (TK2323/TM2213 Mobile Programming)' }),
+    el('h1', { text: 'Activity lifecycle, in AR' }),
+    el('p', { class: 'lead', text: 'TK2323/TM2213 Mobile Programming · three short sessions over one week' }),
+    dayPills(),
     el('label', { for: 'pid', text: 'Your participant ID' }),
     input, err, btn,
   ]);
@@ -138,14 +151,15 @@ async function sessionIntro() {
   const day = CONFIG.SESSION_DAYS[S.sessionNo];
   const btn = el('button', { class: 'btn primary', type: 'button', text: 'Open camera and start' });
   const err = el('p', { class: 'error' });
+  const step = (n, t) => el('li', {}, [el('span', { class: 'n', text: n }), el('span', { text: t })]);
   screen([
     el('h1', { text: `Day ${day} session` }),
-    el('p', { text: `ID: ${S.pid}` }),
-    el('ul', {}, [
-      el('li', { text: 'Place the printed marker card on the table.' }),
-      el('li', { text: 'Make sure the room is well lit and your battery is charged.' }),
-      el('li', { text: 'Do not open notes or other apps during the session.' }),
-      el('li', { text: 'Allow camera and microphone access when asked.' }),
+    dayPills(S.sessionNo),
+    el('ul', { class: 'steps' }, [
+      step(1, 'Place the printed marker card flat on the table.'),
+      step(2, 'Make sure the room is well lit and your battery is charged.'),
+      step(3, 'Do not open notes or other apps during the session.'),
+      step(4, 'Allow camera and microphone access when asked.'),
     ]),
     err, btn,
   ]);
@@ -154,6 +168,7 @@ async function sessionIntro() {
   btn.textContent = 'Opening camera…';
   try {
     await AR.start();
+    if (AR.mode() === 'ar') Hand.load();   // muat model tangan awal supaya soalan gesture tidak tertunggu
   } catch (e) {
     console.error(e);
     err.textContent = 'The camera could not be opened. Allow camera access in your browser settings, then reload the page.';
@@ -214,8 +229,10 @@ async function runSession() {
   const toReview = Object.keys(SUBTOPICS).filter((s) => bySub[s].score < CONFIG.CRITERION);
   if (toReview.length) {
     await message('Review', [
-      `You need to review: ${toReview.map((s) => SUBTOPICS[s]).join(', ')}.`,
-      'For each part, read the content and use the AR. When you are ready, answer the 5 questions for that part. Repeat until all 5 are correct. Take as much time as you need.',
+      'For each part below, study the content in AR. When you are ready, answer its 5 questions again. Repeat until all 5 are correct. Take as much time as you need.',
+      el('div', { class: 'sub-list' }, Object.keys(SUBTOPICS).map((s) => el('div', { class: 'sub-row', style: `--c:${SUB_COLORS[s]}` }, [
+        `${s} · ${SUBTOPICS[s]}`, el('small', { text: toReview.includes(s) ? 'Review' : 'Done' }),
+      ]))),
     ], 'Start review');
     for (const sub of toReview) await relearn(sub, bySub[sub].wrong);
   }
@@ -320,7 +337,7 @@ async function relearn(sub, wrongFromUji) {
 function message(title, paras, btnText) {
   AR.showDiagram(false);
   const btn = el('button', { class: 'btn primary', type: 'button', text: btnText });
-  screen([el('h1', { text: title }), ...paras.map((t) => el('p', { text: t })), btn]);
+  screen([el('h1', { text: title }), ...paras.map((t) => (t instanceof Node ? t : el('p', { text: t }))), btn]);
   return waitClick(btn);
 }
 
