@@ -15,6 +15,8 @@ const LIB = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
 const WASM = `${LIB}/wasm`;
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const TEST = new URLSearchParams(location.search).get('testhand') === '1';
+// iPhone/iPad: elak konteks WebGL ketiga (MindAR + three.js sudah guna GPU); Safari boleh memuat semula halaman jika memori penuh
+export const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 const PINCH_ON = 0.33;    // jarak ibu jari–telunjuk ÷ saiz tapak tangan
 const PINCH_OFF = 0.48;   // histeresis supaya picitan tidak berkelip
@@ -42,7 +44,8 @@ export function load() {
         runningMode: 'VIDEO', numHands: 1,
         minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
       });
-      try { landmarker = await make('GPU'); } catch { landmarker = await make('CPU'); }
+      if (IS_IOS) landmarker = await make('CPU');
+      else { try { landmarker = await make('GPU'); } catch { landmarker = await make('CPU'); } }
       state.ready = true;
       return true;
     } catch (e) {

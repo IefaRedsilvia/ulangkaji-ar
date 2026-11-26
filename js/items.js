@@ -298,53 +298,107 @@ function speechItem(item, ctx, text) {
     const rt = new ActiveTimer();
     const shownAt = performance.now();
     let firstSpeech = null, micPresses = 0, retries = 0, transcript = '', alternatives = [];
+    let failures = 0, fallbackReason = null;
     let inputMode = SR && !CONFIG.DEV ? 'speech' : 'typed';
     const status = el('p', { class: 'q-help' });
     const heard = el('p', { class: 'heard' });
     const micBtn = el('button', { class: 'btn mic', type: 'button', text: 'Tap to speak' });
     const submit = el('button', { class: 'btn primary', type: 'button', text: 'Submit', disabled: true });
     const retry = el('button', { class: 'btn', type: 'button', text: 'Say it again', hidden: true });
+    const typeBtn = el('button', { class: 'btn small ghost', type: 'button', text: 'Speech not working? Type your answer instead', hidden: true });
     const typed = el('input', { class: 'typed', type: 'text', placeholder: 'Type your answer', autocomplete: 'off', autocapitalize: 'off', hidden: true });
 
-    function useTyped(reason) {
+    function useTyped(reason, why) {
       inputMode = 'typed';
-      micBtn.hidden = true; retry.hidden = true; typed.hidden = false;
+      if (why && !fallbackReason) fallbackReason = why;
+      try { rec && rec.abort(); } catch { /* abaikan */ }
+      clearTimeout(watchdog);
+      micBtn.hidden = true; retry.hidden = true; typeBtn.hidden = true; typed.hidden = false;
+      heard.textContent = '';
       status.textContent = reason || 'Type your answer.';
       typed.focus();
     }
     typed.addEventListener('input', () => { transcript = typed.value; submit.disabled = !typed.value.trim(); });
+    typeBtn.onclick = () => useTyped('Type your answer.', 'student_choice');
 
-    let rec = null;
+    // Pengecaman suara di iPhone kadang-kadang tidak pernah memulangkan hasil
+    // (terutamanya semasa kamera digunakan). Penjaga masa menghentikannya dan
+    // memberi pilihan untuk mencuba semula atau menaip.
+    let rec = null, watchdog = 0, gotResult = false, closed = false;
+    function resetMic(msg) {
+      clearTimeout(watchdog);
+      micBtn.disabled = false;
+      micBtn.textContent = 'Tap to speak';
+      if (msg) status.textContent = msg;
+      if (failures >= 1) typeBtn.hidden = false;
+      if (failures >= 3) useTyped('Speech recognition is not working on this phone. Type your answer.', 'repeated_failure');
+    }
     function listen() {
       micPresses++;
-      rec = new SR();
+      gotResult = false;
+      closed = false;
+      heard.textContent = '';
+      try {
+        rec = new SR();
+      } catch { useTyped('Speech recognition is not available. Type your answer.', 'unavailable'); return; }
       rec.lang = 'en-US';
-      rec.interimResults = false;
+      rec.interimResults = true;
+      rec.continuous = false;
       rec.maxAlternatives = 3;
       micBtn.disabled = true;
       micBtn.textContent = 'Listening…';
+      status.textContent = 'Say your answer now.';
       rec.onspeechstart = () => { if (firstSpeech === null) firstSpeech = performance.now() - shownAt; };
       rec.onresult = (e) => {
-        const res = e.results[0];
-        alternatives = Array.from(res).map((a) => a.transcript);
-        transcript = alternatives[0] || '';
+        const res = e.results[e.results.length - 1];
+        const alts = Array.from(res).map((a) => a.transcript).filter(Boolean);
+        if (!alts.length) return;
+        if (firstSpeech === null) firstSpeech = performance.now() - shownAt;
+        alternatives = alts;
+        transcript = alts[0];
         heard.textContent = `Heard: "${transcript}"`;
-        submit.disabled = !transcript;
-        retry.hidden = false;
-        micBtn.hidden = true;
+        if (res.isFinal) finishListening();
       };
       rec.onerror = (e) => {
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') useTyped('Microphone access was not allowed. Type your answer.');
-        else status.textContent = 'Could not hear you. Try again.';
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          useTyped('Microphone access was not allowed. Type your answer.', 'not_allowed');
+          return;
+        }
+        if (!gotResult && !transcript && !closed) { closed = true; failures++; resetMic("Didn't catch that. Tap to speak and try again."); }
       };
-      rec.onend = () => { micBtn.disabled = false; micBtn.textContent = 'Tap to speak'; };
-      try { rec.start(); } catch { useTyped(); }
+      rec.onend = () => {
+        if (transcript && !gotResult) finishListening();
+        else if (!gotResult && !closed && inputMode === 'speech') { closed = true; failures++; resetMic("Didn't catch that. Tap to speak and try again."); }
+      };
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (gotResult || inputMode !== 'speech') return;
+        try { rec.stop(); } catch { /* abaikan */ }
+        // jika separuh ayat sudah didengar, terima; jika tidak, kira sebagai gagal
+        if (transcript) finishListening();
+        else if (!closed) { closed = true; try { rec.abort(); } catch { /* abaikan */ } failures++; resetMic("Didn't catch that. Tap to speak and try again."); }
+      }, 8000);
+      try { rec.start(); } catch { useTyped('Speech recognition could not start. Type your answer.', 'start_failed'); }
+    }
+    function finishListening() {
+      if (gotResult) return;
+      gotResult = true;
+      clearTimeout(watchdog);
+      try { rec && rec.stop(); } catch { /* abaikan */ }
+      submit.disabled = !transcript;
+      micBtn.hidden = true;
+      micBtn.disabled = false;
+      micBtn.textContent = 'Tap to speak';
+      retry.hidden = false;
+      typeBtn.hidden = false;
+      status.textContent = 'Check what was heard, then submit or say it again.';
     }
     micBtn.onclick = listen;
-    retry.onclick = () => { retries++; heard.textContent = ''; submit.disabled = true; retry.hidden = true; micBtn.hidden = false; listen(); };
+    retry.onclick = () => { retries++; transcript = ''; alternatives = []; submit.disabled = true; retry.hidden = true; micBtn.hidden = false; listen(); };
 
     submit.onclick = () => {
       rt.stop();
+      clearTimeout(watchdog);
       try { rec && rec.abort(); } catch { /* abaikan */ }
       const cands = (inputMode === 'typed' ? [transcript] : alternatives).map(normaliseSpeech);
       const match = speechMatch(cands, item.accept);
@@ -361,12 +415,14 @@ function speechItem(item, ctx, text) {
           speech_mic_presses: micPresses,
           speech_retries: retries,
           speech_match: match,
+          speech_failures: failures,
+          speech_fallback_reason: fallbackReason,
         },
       });
     };
 
     ui().replaceChildren(el('section', { class: 'panel panel-full' }, [
-      ...header(ctx, text, item), status, micBtn, heard, typed, el('div', { class: 'row' }, [retry, submit]),
+      ...header(ctx, text, item), status, micBtn, heard, typed, el('div', { class: 'row' }, [retry, submit]), typeBtn,
     ]));
     if (inputMode === 'typed') useTyped(CONFIG.DEV ? 'DEV MODE: type the answer.' : 'Speech recognition is not supported here. Type your answer.');
     else status.textContent = 'Tap the button and say your answer.';

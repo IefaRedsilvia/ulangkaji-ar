@@ -168,7 +168,8 @@ async function sessionIntro() {
   btn.textContent = 'Opening camera…';
   try {
     await AR.start();
-    if (AR.mode() === 'ar') Hand.load();   // muat model tangan awal supaya soalan gesture tidak tertunggu
+    // Muat model tangan awal (kecuali iPhone: dimuat hanya bila soalan gesture pertama muncul, untuk jimat memori)
+    if (AR.mode() === 'ar' && !Hand.IS_IOS) Hand.load();
   } catch (e) {
     console.error(e);
     err.textContent = 'The camera could not be opened. Allow camera access in your browser settings, then reload the page.';
