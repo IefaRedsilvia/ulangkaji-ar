@@ -9,6 +9,6 @@
 // juga kosong, apps berjalan dalam MOD TEMPATAN.
 // =====================================================================
 export const sheetsConfig = {
-  SHEETS_URL: 'https://script.google.com/macros/s/XXXX/exec',
+  SHEETS_URL: 'https://script.google.com/macros/s/AKfycbyh_TCDU5hwQw9FMfMqjDhuWe-JL7wQzophIznNvL5pFvD_Ea9jzipia0QqmeqBnUdh/exec',
   APP_TOKEN: 'ulangkaji2026',
 };
