@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Peraturan keselamatan Firestore untuk prototaip pengumpulan data.
+// - Semua pengguna mesti log masuk (tanpa nama) melalui apps.
+// - participants: boleh dibaca supaya apps tahu sesi ke berapa
+//   (hanya ID samaran dan kiraan sesi; tiada nama atau nombor matrik).
+// - Koleksi lain: pelajar hanya boleh MENULIS rekod sendiri,
+//   tidak boleh membaca, mengubah rekod orang lain atau memadam.
+// Penyelidik membaca data melalui Firebase Console atau tools/export_firestore.py
+// (akaun servis memintas peraturan ini).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function ownsNew() { return signedIn() && request.resource.data.uid == request.auth.uid; }
+    function ownsOld() { return signedIn() && resource.data.uid == request.auth.uid; }
+
+    match /participants/{pid} {
+      allow read: if signedIn();
+      allow create: if ownsNew() && request.resource.data.pid == pid;
+      // Kemas kini dibenarkan (pelajar mungkin log masuk dari pelayar baharu),
+      // tetapi persetujuan dan ID tidak boleh diubah.
+      allow update: if signedIn()
+        && request.resource.data.pid == resource.data.pid
+        && request.resource.data.consent_ts == resource.data.consent_ts;
+      allow delete: if false;
+    }
+
+    match /sessions/{id} {
+      allow create: if ownsNew();
+      allow update: if ownsOld() && ownsNew();
+      allow read, delete: if false;
+    }
+
+    match /subtopic_results/{id} {
+      allow create: if ownsNew();
+      allow update: if ownsOld() && ownsNew();
+      allow read, delete: if false;
+    }
+
+    match /item_responses/{id} {
+      allow create: if ownsNew();
+      allow read, update, delete: if false;
+    }
+
+    match /events/{id} {
+      allow create: if ownsNew();
+      allow read, update, delete: if false;
+    }
+  }
+}
